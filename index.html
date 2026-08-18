@@ -65,6 +65,17 @@
     <div class="tab" data-tab="incoming" onclick="setTab('incoming')">Incoming</div>
   </div>
 
+  <div id="scanBar" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn" id="scanBtn" onclick="scanAll()">🔄 Scan All</button>
+      <span id="scanText" style="color:var(--muted);font-size:13px"></span>
+    </div>
+    <div id="scanProgWrap" style="display:none;margin-top:10px;background:#0c0e12;border-radius:5px;height:8px;overflow:hidden">
+      <div id="scanProgBar" style="height:100%;width:8%;background:var(--info);animation:scanpulse 1.4s ease-in-out infinite"></div>
+    </div>
+  </div>
+  <style>@keyframes scanpulse{0%{margin-left:0%;width:15%}50%{margin-left:70%;width:25%}100%{margin-left:0%;width:15%}}</style>
+
   <div class="toolbar">
     <input type="text" id="search" placeholder="Search order#, customer, email..." oninput="render()" style="min-width:240px">
     <select id="statusFilter" onchange="render()">
@@ -110,10 +121,41 @@ if (localStorage.getItem('hdpc-core-auth') === '1') {
 function setTab(t) {
   currentTab = t;
   document.querySelectorAll('.tab').forEach(function(el){ el.classList.toggle('active', el.dataset.tab===t); });
+  document.getElementById('scanBar').style.display = (t === 'incoming') ? 'block' : 'none';
   render();
 }
 
 function setStatusMsg(m) { document.getElementById('status').textContent = m; }
+
+// ── SCAN ALL — kicks off a full Shippo re-sync, polls live progress, refreshes when done ──
+var scanPollTimer = null;
+function scanAll() {
+  var btn = document.getElementById('scanBtn'), text = document.getElementById('scanText'), progWrap = document.getElementById('scanProgWrap');
+  btn.disabled = true; btn.textContent = 'Scanning…'; progWrap.style.display = 'block';
+  text.textContent = 'Starting scan…';
+
+  fetch(API_URL + '?action=sync&token=' + encodeURIComponent(ACTION_TOKEN))
+    .then(function(){ finishScan(); })
+    .catch(function(){ finishScan(); });
+
+  scanPollTimer = setInterval(function() {
+    fetch(API_URL + '?action=scanStatus&token=' + encodeURIComponent(VIEW_TOKEN))
+      .then(function(r){ return r.json(); })
+      .then(function(p){
+        if (!p.running) return;
+        var phase = p.phase === 'orders' ? 'Loading order registry…' : 'Scanning return labels — page ' + (p.pages||0) + ', ' + (p.matched||0) + ' core orders found so far…';
+        text.textContent = phase;
+      })
+      .catch(function(){});
+  }, 3000);
+}
+function finishScan() {
+  clearInterval(scanPollTimer);
+  var btn = document.getElementById('scanBtn'), text = document.getElementById('scanText'), progWrap = document.getElementById('scanProgWrap');
+  btn.disabled = false; btn.textContent = '🔄 Scan All'; progWrap.style.display = 'none';
+  text.textContent = 'Scan complete — refreshed just now.';
+  pull();
+}
 
 function pull() {
   setStatusMsg('Loading…');
@@ -168,7 +210,16 @@ function render() {
     if (sf && displayStatus(o) !== sf) return false;
     return true;
   });
-  list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
+  if (currentTab === 'incoming') {
+    // Delivered (needs checking in now) first, then In Transit soonest-ETA first, no-ETA last.
+    list.sort(function(a,b) {
+      if (a.status !== b.status) return a.status === 'Delivered' ? -1 : (b.status === 'Delivered' ? 1 : 0);
+      var ea = a.eta || 'zzz', eb = b.eta || 'zzz';
+      return ea < eb ? -1 : (ea > eb ? 1 : 0);
+    });
+  } else {
+    list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
+  }
 
   if (!list.length) { document.getElementById('tableWrap').innerHTML = '<div class="empty">No orders match.</div>'; return; }
 
@@ -180,7 +231,7 @@ function render() {
       '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
     return '<tr>' +
       '<td><b>#' + (o.order||'') + '</b></td>' +
-      '<td>' + (o.name||'') + '<div style="color:var(--muted);font-size:11px">' + (o.email||'') + '</div></td>' +
+      '<td>' + (o.name||'') + '<div style="color:var(--muted);font-size:11px">' + (o.desc||o.email||'') + '</div></td>' +
       '<td>' + (o.ship||'') + '<div style="color:var(--muted);font-size:11px">' + daysSince(o.ship) + '</div></td>' +
       '<td><span class="pill ' + pillClass(st) + '">' + st + '</span></td>' +
       '<td>' + (o.eta||'') + '</td>' +
