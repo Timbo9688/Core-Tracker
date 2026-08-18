@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HDPC Core Tracker</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --border:#2a2e38; --text:#e8e8ea; --muted:#9aa0ab; --accent:#c0392b; --good:#2e9e5b; --warn:#c9962b; --info:#2f6fb0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  #gate { display:flex; align-items:center; justify-content:center; height:100vh; }
+  #gate .box { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:32px; width:280px; text-align:center; }
+  #gate input { width:100%; padding:10px; margin:14px 0; border-radius:6px; border:1px solid var(--border); background:#0c0e12; color:var(--text); font-size:15px; }
+  #gate button, .btn { background:var(--accent); color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-size:14px; }
+  #app { display:none; max-width:1200px; margin:0 auto; padding:20px; }
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:20px; margin:0; }
+  header .sub { color:var(--muted); font-size:13px; }
+  .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+  .toolbar input, .toolbar select { padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:14px; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; }
+  .tab { padding:8px 14px; border-radius:6px 6px 0 0; background:var(--panel); color:var(--muted); cursor:pointer; border:1px solid var(--border); border-bottom:none; }
+  .tab.active { color:var(--text); background:#1d212b; }
+  table { width:100%; border-collapse:collapse; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.await { background:#3a3120; color:var(--warn); }
+  .pill.transit { background:#1e2f42; color:var(--info); }
+  .pill.delivered, .pill.received { background:#1c3626; color:var(--good); }
+  .pill.waived { background:#2a2a2a; color:var(--muted); }
+  .rowbtn { background:transparent; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer; margin-right:6px; }
+  .rowbtn:hover { border-color:var(--accent); }
+  .rowbtn.waive:hover { border-color:var(--warn); }
+  #status { color:var(--muted); font-size:12px; margin-left:8px; }
+  .empty { color:var(--muted); text-align:center; padding:40px; }
+  a { color:#6fa8e0; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="box">
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px">HDPC Core Tracker</div>
+    <div style="color:var(--muted);font-size:13px">Enter password to continue</div>
+    <input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')tryLogin()">
+    <button onclick="tryLogin()">Enter</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <h1>HDPC Core Tracker</h1>
+      <div class="sub">Live from Shippo &middot; <span id="lastPull">not loaded yet</span></div>
+    </div>
+    <div>
+      <button class="btn" onclick="pull()">Pull latest</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="all" onclick="setTab('all')">All Orders</div>
+    <div class="tab" data-tab="incoming" onclick="setTab('incoming')">Incoming</div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search order#, customer, email..." oninput="render()" style="min-width:240px">
+    <select id="statusFilter" onchange="render()">
+      <option value="">All statuses</option>
+      <option value="Awaiting Return">Awaiting Return</option>
+      <option value="In Transit">In Transit</option>
+      <option value="Delivered">Delivered</option>
+      <option value="Received">Received</option>
+      <option value="Waived">Waived</option>
+    </select>
+    <span id="status"></span>
+  </div>
+
+  <div id="tableWrap"></div>
+</div>
+
+<script>
+// ── CONFIG ─────────────────────────────────────────────────────────────
+var API_URL = 'https://script.google.com/macros/s/AKfycbyWBQUNrMQFPGNQ1Mpz_lVHyH4C9IuLNkFIhHZXWsQHo97ZQUP0lLEy2dRc3ChNI9OE5A/exec';
+var VIEW_TOKEN = 'hdpc-view-3Rk8pZqW9t';
+var ACTION_TOKEN = 'hdpc-act-9mQ2xVw7Ln4Pz';
+var APP_PASSWORD = 'hdpc-core-2026';   // client-side gate only, not real security — change this string to reset it
+
+var orders = [];
+var currentTab = 'all';
+
+function tryLogin() {
+  var v = document.getElementById('pw').value;
+  if (v === APP_PASSWORD) {
+    localStorage.setItem('hdpc-core-auth', '1');
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    pull();
+  } else {
+    document.getElementById('pw').style.borderColor = '#c0392b';
+  }
+}
+if (localStorage.getItem('hdpc-core-auth') === '1') {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+function setTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach(function(el){ el.classList.toggle('active', el.dataset.tab===t); });
+  render();
+}
+
+function setStatusMsg(m) { document.getElementById('status').textContent = m; }
+
+function pull() {
+  setStatusMsg('Loading…');
+  fetch(API_URL + '?action=data&token=' + encodeURIComponent(VIEW_TOKEN))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      orders = d.orders || [];
+      document.getElementById('lastPull').textContent = 'pulled ' + new Date().toLocaleTimeString();
+      setStatusMsg(orders.length + ' orders');
+      render();
+    })
+    .catch(function(e){ setStatusMsg('Error loading data: ' + e); });
+}
+
+function displayStatus(o) {
+  if (o.override === 'Received') return 'Received';
+  if (o.override === 'Waived') return 'Waived';
+  return o.status || 'Awaiting Return';
+}
+function pillClass(s) {
+  if (s === 'In Transit') return 'transit';
+  if (s === 'Delivered') return 'delivered';
+  if (s === 'Received') return 'received';
+  if (s === 'Waived') return 'waived';
+  return 'await';
+}
+function daysSince(shipStr) {
+  if (!shipStr) return '';
+  var d = new Date(shipStr);
+  if (isNaN(d)) return '';
+  var days = Math.floor((new Date().setHours(0,0,0,0) - d.setHours(0,0,0,0)) / 86400000);
+  return days + 'd';
+}
+
+function action(order, act, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  fetch(API_URL + '?action=' + act + '&order=' + encodeURIComponent(order) + '&token=' + encodeURIComponent(ACTION_TOKEN))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if (res.ok) { setStatusMsg('#' + order + ' updated.'); pull(); }
+      else { setStatusMsg('Error: ' + (res.error||'unknown')); btn.disabled=false; }
+    })
+    .catch(function(e){ setStatusMsg('Error: ' + e); btn.disabled=false; });
+}
+
+function render() {
+  var q = (document.getElementById('search').value || '').toLowerCase();
+  var sf = document.getElementById('statusFilter').value;
+  var list = orders.filter(function(o) {
+    if (currentTab === 'incoming' && !(o.status==='In Transit' || o.status==='Delivered')) return false;
+    if (q && !((o.order+' '+o.name+' '+o.email).toLowerCase().indexOf(q) >= 0)) return false;
+    if (sf && displayStatus(o) !== sf) return false;
+    return true;
+  });
+  list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
+
+  if (!list.length) { document.getElementById('tableWrap').innerHTML = '<div class="empty">No orders match.</div>'; return; }
+
+  var rows = list.map(function(o) {
+    var st = displayStatus(o);
+    var resolved = (st === 'Received' || st === 'Waived');
+    var actions = resolved ? '<span style="color:var(--muted);font-size:12px">resolved</span>' :
+      '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">Check In</button>' +
+      '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
+    return '<tr>' +
+      '<td><b>#' + (o.order||'') + '</b></td>' +
+      '<td>' + (o.name||'') + '<div style="color:var(--muted);font-size:11px">' + (o.email||'') + '</div></td>' +
+      '<td>' + (o.ship||'') + '<div style="color:var(--muted);font-size:11px">' + daysSince(o.ship) + '</div></td>' +
+      '<td><span class="pill ' + pillClass(st) + '">' + st + '</span></td>' +
+      '<td>' + (o.eta||'') + '</td>' +
+      '<td>' + (o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '') + '</td>' +
+      '<td>' + (o.stage||0) + '/4' + (o.lastRem ? ' <div style="color:var(--muted);font-size:11px">' + o.lastRem + '</div>' : '') + '</td>' +
+      '<td>' + actions + '</td>' +
+    '</tr>';
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML =
+    '<table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+</script>
+</body>
+</html>
