@@ -36,6 +36,18 @@
   #status { color:var(--muted); font-size:12px; margin-left:8px; }
   .empty { color:var(--muted); text-align:center; padding:40px; }
   a { color:#6fa8e0; }
+  .daySection { margin-bottom:18px; }
+  .dayHead { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .dayHead .dot { width:8px; height:8px; border-radius:50%; background:var(--info); }
+  .dayHead.today .dot { background:var(--warn); }
+  .dayHead.arrived .dot { background:var(--good); }
+  .dayHead h3 { font-size:14px; margin:0; font-weight:700; }
+  .dayHead .count { color:var(--muted); font-size:12px; }
+  .coreCard { display:flex; justify-content:space-between; align-items:center; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:6px; gap:12px; }
+  .coreCard .info b { font-size:13px; }
+  .coreCard .info .desc { color:var(--muted); font-size:12px; margin-top:2px; }
+  .coreCard .info .meta { color:var(--muted); font-size:11px; margin-top:3px; }
+  .emptyDay { color:var(--muted); font-size:12px; padding:6px 2px 0; font-style:italic; }
 </style>
 </head>
 <body>
@@ -201,28 +213,63 @@ function action(order, act, btn) {
     .catch(function(e){ setStatusMsg('Error: ' + e); btn.disabled=false; });
 }
 
-function render() {
-  var q = (document.getElementById('search').value || '').toLowerCase();
-  var sf = document.getElementById('statusFilter').value;
-  var list = orders.filter(function(o) {
-    if (currentTab === 'incoming' && !(o.status==='In Transit' || o.status==='Delivered')) return false;
-    if (q && !((o.order+' '+o.name+' '+o.email).toLowerCase().indexOf(q) >= 0)) return false;
-    if (sf && displayStatus(o) !== sf) return false;
-    return true;
-  });
-  if (currentTab === 'incoming') {
-    // Delivered (needs checking in now) first, then In Transit soonest-ETA first, no-ETA last.
-    list.sort(function(a,b) {
-      if (a.status !== b.status) return a.status === 'Delivered' ? -1 : (b.status === 'Delivered' ? 1 : 0);
-      var ea = a.eta || 'zzz', eb = b.eta || 'zzz';
-      return ea < eb ? -1 : (ea > eb ? 1 : 0);
-    });
-  } else {
-    list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
+function etaToDate(etaStr) {
+  if (!etaStr) return null;
+  var parts = etaStr.split('/');
+  if (parts.length !== 2) return null;
+  var now = new Date();
+  var d = new Date(now.getFullYear(), parseInt(parts[0],10)-1, parseInt(parts[1],10));
+  if (isNaN(d)) return null;
+  if (d - now < -60*86400000) d.setFullYear(d.getFullYear()+1);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function coreCard(o) {
+  var st = displayStatus(o);
+  var actions = '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">Check In</button>' +
+    '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
+  var trk = o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '';
+  return '<div class="coreCard"><div class="info">' +
+    '<b>#' + (o.order||'') + ' — ' + (o.name||'') + '</b>' +
+    (o.desc ? '<div class="desc">' + o.desc + '</div>' : '') +
+    '<div class="meta">' + trk + (o.eta ? ' &middot; ETA ' + o.eta : '') + '</div>' +
+    '</div><div style="white-space:nowrap">' + actions + '</div></div>';
+}
+
+function renderIncoming(list) {
+  var arrived = list.filter(function(o){ return o.status === 'Delivered'; });
+  var inTransit = list.filter(function(o){ return o.status === 'In Transit'; });
+
+  var html = '';
+  html += '<div class="daySection"><div class="dayHead arrived"><span class="dot"></span><h3>✅ Arrived — check in now</h3><span class="count">' + arrived.length + '</span></div>';
+  html += arrived.length ? arrived.map(coreCard).join('') : '<div class="emptyDay">Nothing arrived yet.</div>';
+  html += '</div>';
+
+  var today = new Date(); today.setHours(0,0,0,0);
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var later = [];
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(today.getTime() + i*86400000);
+    var dayItems = inTransit.filter(function(o) { var ed = etaToDate(o.eta); return ed && ed.getTime() === d.getTime(); });
+    var label = i===0 ? 'Today — ' + dayNames[d.getDay()] : (i===1 ? 'Tomorrow — ' + dayNames[d.getDay()] : dayNames[d.getDay()]);
+    label += ' (' + (d.getMonth()+1) + '/' + d.getDate() + ')';
+    html += '<div class="daySection"><div class="dayHead' + (i===0?' today':'') + '"><span class="dot"></span><h3>' + label + '</h3><span class="count">' + dayItems.length + '</span></div>';
+    html += dayItems.length ? dayItems.map(coreCard).join('') : '<div class="emptyDay">Nothing scheduled.</div>';
+    html += '</div>';
   }
+  var weekEnd = new Date(today.getTime() + 7*86400000);
+  later = inTransit.filter(function(o) { var ed = etaToDate(o.eta); return !ed || ed.getTime() >= weekEnd.getTime(); });
+  if (later.length) {
+    html += '<div class="daySection"><div class="dayHead"><span class="dot" style="background:var(--muted)"></span><h3>Later / No ETA yet</h3><span class="count">' + later.length + '</span></div>';
+    html += later.map(coreCard).join('');
+    html += '</div>';
+  }
+  document.getElementById('tableWrap').innerHTML = html;
+}
 
+function renderAllTable(list) {
+  list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
   if (!list.length) { document.getElementById('tableWrap').innerHTML = '<div class="empty">No orders match.</div>'; return; }
-
   var rows = list.map(function(o) {
     var st = displayStatus(o);
     var resolved = (st === 'Received' || st === 'Waived');
@@ -240,9 +287,23 @@ function render() {
       '<td>' + actions + '</td>' +
     '</tr>';
   }).join('');
-
   document.getElementById('tableWrap').innerHTML =
     '<table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function render() {
+  var q = (document.getElementById('search').value || '').toLowerCase();
+  var sf = document.getElementById('statusFilter').value;
+  var list = orders.filter(function(o) {
+    if (currentTab === 'incoming') {
+      if (!(o.status==='In Transit' || o.status==='Delivered')) return false;
+      var ds = displayStatus(o); if (ds === 'Received' || ds === 'Waived') return false;   // already handled, drop off the planner
+    }
+    if (q && !((o.order+' '+o.name+' '+o.email).toLowerCase().indexOf(q) >= 0)) return false;
+    if (sf && displayStatus(o) !== sf) return false;
+    return true;
+  });
+  if (currentTab === 'incoming') renderIncoming(list); else renderAllTable(list);
 }
 </script>
 </body>
