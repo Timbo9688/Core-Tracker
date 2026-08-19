@@ -86,6 +86,7 @@
   }
   .rowbtn:hover { border-color:var(--good); background:rgba(51,181,109,.08); }
   .rowbtn.waive:hover { border-color:var(--warn); background:rgba(224,168,60,.08); }
+  .rowbtn.pause:hover, .rowbtn.resume:hover { border-color:var(--info); background:rgba(74,144,217,.08); }
 
   #status { color:var(--muted); font-size:12px; margin-left:4px; }
   .empty { color:var(--muted); text-align:center; padding:50px 20px; font-size:14px; }
@@ -379,9 +380,16 @@ function renderAllTable(list) {
   var rows = list.map(function(o) {
     var st = displayStatus(o);
     var resolved = (st === 'Received' || st === 'Waived');
+    var paused = !!o.paused;
+    var pauseBtn = paused
+      ? '<button class="rowbtn resume" onclick="action(\'' + o.order + '\',\'resume\',this)">▶ Resume</button>'
+      : '<button class="rowbtn pause" onclick="action(\'' + o.order + '\',\'pause\',this)">⏸ Pause</button>';
     var actions = resolved ? '<span style="color:var(--muted);font-size:12px">resolved</span>' :
       '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">Check In</button>' +
-      '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
+      '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>' +
+      pauseBtn;
+    var reminderCell = (o.stage||0) + '/4' + (o.lastRem ? ' <div style="color:var(--muted);font-size:11px">' + o.lastRem + '</div>' : '');
+    if (paused) reminderCell += ' <span class="pill waived" style="margin-top:3px;display:inline-block">⏸ Paused</span>';
     return '<tr>' +
       '<td><b>#' + (o.order||'') + '</b></td>' +
       '<td>' + (o.name||'') + '<div style="color:var(--muted);font-size:11px">' + (o.desc||o.email||'') + '</div></td>' +
@@ -389,7 +397,7 @@ function renderAllTable(list) {
       '<td><span class="pill ' + pillClass(st) + '">' + st + '</span></td>' +
       '<td>' + (o.eta||'') + '</td>' +
       '<td>' + (o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '') + '</td>' +
-      '<td>' + (o.stage||0) + '/4' + (o.lastRem ? ' <div style="color:var(--muted);font-size:11px">' + o.lastRem + '</div>' : '') + '</td>' +
+      '<td>' + reminderCell + '</td>' +
       '<td>' + actions + '</td>' +
     '</tr>';
   }).join('');
