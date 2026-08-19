@@ -5,55 +5,122 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HDPC Core Tracker</title>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --border:#2a2e38; --text:#e8e8ea; --muted:#9aa0ab; --accent:#c0392b; --good:#2e9e5b; --warn:#c9962b; --info:#2f6fb0; }
+  :root {
+    --bg:#0b0d11; --panel:rgba(23,26,33,.86); --panel-solid:#171a21; --border:#2a2e38;
+    --text:#eef0f2; --muted:#98a0ac; --accent:#e0453a; --accent2:#ff6a5a;
+    --good:#33b56d; --warn:#e0a83c; --info:#4a90d9;
+    --radius:12px; --shadow:0 8px 24px rgba(0,0,0,.35);
+  }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+  html,body { margin:0; min-height:100%; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    min-height:100vh; position:relative;
+  }
+  #bgLayer {
+    position:fixed; inset:0; z-index:-1;
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+    filter:brightness(.55) saturate(1.05);
+  }
+  #bgLayer::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(11,13,17,.55), rgba(11,13,17,.85));
+  }
+
   #gate { display:flex; align-items:center; justify-content:center; height:100vh; }
-  #gate .box { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:32px; width:280px; text-align:center; }
-  #gate input { width:100%; padding:10px; margin:14px 0; border-radius:6px; border:1px solid var(--border); background:#0c0e12; color:var(--text); font-size:15px; }
-  #gate button, .btn { background:var(--accent); color:#fff; border:none; padding:9px 16px; border-radius:6px; cursor:pointer; font-size:14px; }
-  #app { display:none; max-width:1200px; margin:0 auto; padding:20px; }
-  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
-  header h1 { font-size:20px; margin:0; }
-  header .sub { color:var(--muted); font-size:13px; }
-  .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
-  .toolbar input, .toolbar select { padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:14px; }
-  .tabs { display:flex; gap:6px; margin-bottom:14px; }
-  .tab { padding:8px 14px; border-radius:6px 6px 0 0; background:var(--panel); color:var(--muted); cursor:pointer; border:1px solid var(--border); border-bottom:none; }
-  .tab.active { color:var(--text); background:#1d212b; }
-  table { width:100%; border-collapse:collapse; font-size:13px; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); }
-  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+  #gate .box { background:var(--panel-solid); border:1px solid var(--border); border-radius:var(--radius); padding:36px; width:300px; text-align:center; box-shadow:var(--shadow); }
+  #gate .logo { font-size:28px; margin-bottom:6px; }
+  #gate input { width:100%; padding:11px 12px; margin:16px 0; border-radius:8px; border:1px solid var(--border); background:#0c0e12; color:var(--text); font-size:15px; outline:none; transition:border-color .15s; }
+  #gate input:focus { border-color:var(--accent); }
+  #gate button, .btn {
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none;
+    padding:10px 18px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px; transition:transform .12s, box-shadow .12s;
+    box-shadow:0 2px 8px rgba(224,69,58,.25);
+  }
+  .btn:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(224,69,58,.35); }
+  .btn:disabled { opacity:.55; cursor:default; transform:none; box-shadow:none; }
+  .btn.ghost { background:transparent; box-shadow:none; border:1px solid var(--border); color:var(--text); }
+  .btn.ghost:hover { border-color:var(--accent); transform:translateY(-1px); box-shadow:none; }
+
+  #app { display:none; max-width:1180px; margin:0 auto; padding:28px 20px 60px; }
+  header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:22px; flex-wrap:wrap; gap:14px; }
+  header .titleRow { display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:22px; margin:0; letter-spacing:-.01em; }
+  header .sub { color:var(--muted); font-size:13px; margin-top:4px; }
+  header .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  .panel { background:var(--panel); backdrop-filter:blur(10px); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+  .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .toolbar input, .toolbar select {
+    padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:var(--panel-solid);
+    color:var(--text); font-size:14px; outline:none; transition:border-color .15s;
+  }
+  .toolbar input:focus, .toolbar select:focus { border-color:var(--accent); }
+
+  .tabs { display:inline-flex; gap:3px; margin-bottom:16px; background:var(--panel-solid); border:1px solid var(--border); border-radius:10px; padding:4px; }
+  .tab { padding:8px 16px; border-radius:7px; color:var(--muted); cursor:pointer; font-size:13px; font-weight:600; transition:background .15s,color .15s; }
+  .tab.active { color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); }
+  .tab:not(.active):hover { color:var(--text); }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  .tableCard { border-radius:var(--radius); overflow:hidden; }
+  th, td { padding:12px 14px; text-align:left; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; background:rgba(255,255,255,.02); }
+  tbody tr { transition:background .12s; }
+  tbody tr:hover { background:rgba(255,255,255,.03); }
   tr:last-child td { border-bottom:none; }
-  .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
-  .pill.await { background:#3a3120; color:var(--warn); }
-  .pill.transit { background:#1e2f42; color:var(--info); }
-  .pill.delivered, .pill.received { background:#1c3626; color:var(--good); }
-  .pill.waived { background:#2a2a2a; color:var(--muted); }
-  .rowbtn { background:transparent; border:1px solid var(--border); color:var(--text); padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer; margin-right:6px; }
-  .rowbtn:hover { border-color:var(--accent); }
-  .rowbtn.waive:hover { border-color:var(--warn); }
-  #status { color:var(--muted); font-size:12px; margin-left:8px; }
-  .empty { color:var(--muted); text-align:center; padding:40px; }
-  a { color:#6fa8e0; }
-  .daySection { margin-bottom:18px; }
-  .dayHead { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .dayHead .dot { width:8px; height:8px; border-radius:50%; background:var(--info); }
-  .dayHead.today .dot { background:var(--warn); }
-  .dayHead.arrived .dot { background:var(--good); }
+
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .pill::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .pill.await { background:rgba(224,168,60,.14); color:var(--warn); }
+  .pill.transit { background:rgba(74,144,217,.14); color:var(--info); }
+  .pill.delivered, .pill.received { background:rgba(51,181,109,.14); color:var(--good); }
+  .pill.waived { background:rgba(255,255,255,.06); color:var(--muted); }
+
+  .rowbtn {
+    background:transparent; border:1px solid var(--border); color:var(--text); padding:6px 12px;
+    border-radius:6px; font-size:12px; cursor:pointer; margin-right:6px; font-weight:600; transition:border-color .12s,background .12s;
+  }
+  .rowbtn:hover { border-color:var(--good); background:rgba(51,181,109,.08); }
+  .rowbtn.waive:hover { border-color:var(--warn); background:rgba(224,168,60,.08); }
+
+  #status { color:var(--muted); font-size:12px; margin-left:4px; }
+  .empty { color:var(--muted); text-align:center; padding:50px 20px; font-size:14px; }
+  a { color:#7ab4f0; }
+
+  .daySection { margin-bottom:16px; }
+  .dayHead { display:flex; align-items:center; gap:10px; margin-bottom:9px; padding-bottom:7px; border-bottom:1px solid var(--border); }
+  .dayHead .dot { width:9px; height:9px; border-radius:50%; background:var(--info); box-shadow:0 0 0 3px rgba(74,144,217,.18); flex-shrink:0; }
+  .dayHead.today .dot { background:var(--warn); box-shadow:0 0 0 3px rgba(224,168,60,.18); }
+  .dayHead.arrived .dot { background:var(--good); box-shadow:0 0 0 3px rgba(51,181,109,.18); }
   .dayHead h3 { font-size:14px; margin:0; font-weight:700; }
-  .dayHead .count { color:var(--muted); font-size:12px; }
-  .coreCard { display:flex; justify-content:space-between; align-items:center; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:6px; gap:12px; }
-  .coreCard .info b { font-size:13px; }
-  .coreCard .info .desc { color:var(--muted); font-size:12px; margin-top:2px; }
-  .coreCard .info .meta { color:var(--muted); font-size:11px; margin-top:3px; }
-  .emptyDay { color:var(--muted); font-size:12px; padding:6px 2px 0; font-style:italic; }
+  .dayHead .count { color:var(--muted); font-size:12px; margin-left:auto; background:rgba(255,255,255,.05); padding:2px 9px; border-radius:20px; }
+
+  .coreCard {
+    display:flex; justify-content:space-between; align-items:center; background:var(--panel-solid);
+    border:1px solid var(--border); border-left:3px solid var(--info); border-radius:9px;
+    padding:12px 16px; margin-bottom:7px; gap:14px; transition:transform .12s,box-shadow .12s;
+  }
+  .coreCard:hover { transform:translateX(2px); box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  .coreCard.arrivedCard { border-left-color:var(--good); }
+  .coreCard .info b { font-size:13.5px; }
+  .coreCard .info .desc { color:var(--muted); font-size:12px; margin-top:3px; line-height:1.4; max-width:520px; }
+  .coreCard .info .meta { color:var(--muted); font-size:11px; margin-top:5px; }
+  .emptyDay { color:var(--muted); font-size:12.5px; padding:4px 2px 2px; opacity:.7; }
+
+  #bgFileInput { display:none; }
 </style>
 </head>
 <body>
 
+<div id="bgLayer"></div>
+
 <div id="gate">
   <div class="box">
+    <div class="logo">🔧</div>
     <div style="font-weight:700;font-size:16px;margin-bottom:4px">HDPC Core Tracker</div>
     <div style="color:var(--muted);font-size:13px">Enter password to continue</div>
     <input type="password" id="pw" placeholder="Password" onkeydown="if(event.key==='Enter')tryLogin()">
@@ -63,13 +130,18 @@
 
 <div id="app">
   <header>
-    <div>
-      <h1>HDPC Core Tracker</h1>
-      <div class="sub">Live from Shippo &middot; <span id="lastPull">not loaded yet</span></div>
+    <div class="titleRow">
+      <div>
+        <h1>🔧 HDPC Core Tracker</h1>
+        <div class="sub">Live from Shippo &middot; <span id="lastPull">not loaded yet</span></div>
+      </div>
     </div>
-    <div>
-      <button class="btn" onclick="pull()">Pull latest</button>
+    <div class="actions">
+      <button class="btn ghost" onclick="document.getElementById('bgFileInput').click()">🖼️ Background</button>
+      <button class="btn ghost" id="bgClearBtn" onclick="clearBackground()" style="display:none">✕ Remove background</button>
+      <button class="btn" onclick="pull()">⟳ Pull latest</button>
     </div>
+    <input type="file" id="bgFileInput" accept="image/*" onchange="onBgFileChosen(event)">
   </header>
 
   <div class="tabs">
@@ -77,19 +149,19 @@
     <div class="tab" data-tab="incoming" onclick="setTab('incoming')">Incoming</div>
   </div>
 
-  <div id="scanBar" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+  <div id="scanBar" class="panel" style="display:none;padding:14px 16px;margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn" id="scanBtn" onclick="scanAll()">🔄 Scan All</button>
       <span id="scanText" style="color:var(--muted);font-size:13px"></span>
     </div>
-    <div id="scanProgWrap" style="display:none;margin-top:10px;background:#0c0e12;border-radius:5px;height:8px;overflow:hidden">
-      <div id="scanProgBar" style="height:100%;width:8%;background:var(--info);animation:scanpulse 1.4s ease-in-out infinite"></div>
+    <div id="scanProgWrap" style="display:none;margin-top:10px;background:#0c0e12;border-radius:5px;height:7px;overflow:hidden">
+      <div id="scanProgBar" style="height:100%;width:15%;background:linear-gradient(90deg,var(--accent),var(--info));animation:scanpulse 1.4s ease-in-out infinite"></div>
     </div>
   </div>
   <style>@keyframes scanpulse{0%{margin-left:0%;width:15%}50%{margin-left:70%;width:25%}100%{margin-left:0%;width:15%}}</style>
 
   <div class="toolbar">
-    <input type="text" id="search" placeholder="Search order#, customer, email..." oninput="render()" style="min-width:240px">
+    <input type="text" id="search" placeholder="🔍 Search order#, customer, email..." oninput="render()" style="min-width:260px">
     <select id="statusFilter" onchange="render()">
       <option value="">All statuses</option>
       <option value="Awaiting Return">Awaiting Return</option>
@@ -129,6 +201,34 @@ if (localStorage.getItem('hdpc-core-auth') === '1') {
   document.getElementById('gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 }
+
+// ── BACKGROUND IMAGE/GIF — stored locally in this browser only ─────────
+function applyBackground(dataUrl) {
+  document.getElementById('bgLayer').style.backgroundImage = dataUrl ? 'url(' + dataUrl + ')' : 'none';
+  document.getElementById('bgClearBtn').style.display = dataUrl ? 'inline-flex' : 'none';
+}
+function onBgFileChosen(ev) {
+  var f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    try {
+      localStorage.setItem('hdpc-core-bg', reader.result);
+      applyBackground(reader.result);
+    } catch (e) {
+      alert('Could not save that image — it may be too large for browser storage. Try a smaller file.');
+    }
+  };
+  reader.readAsDataURL(f);
+}
+function clearBackground() {
+  localStorage.removeItem('hdpc-core-bg');
+  applyBackground(null);
+}
+(function() {
+  var saved = localStorage.getItem('hdpc-core-bg');
+  if (saved) applyBackground(saved);
+})();
 
 function setTab(t) {
   currentTab = t;
@@ -224,12 +324,11 @@ function etaToDate(etaStr) {
   d.setHours(0,0,0,0);
   return d;
 }
-function coreCard(o) {
-  var st = displayStatus(o);
-  var actions = '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">Check In</button>' +
+function coreCard(o, arrived) {
+  var actions = '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">✓ Check In</button>' +
     '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
   var trk = o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '';
-  return '<div class="coreCard"><div class="info">' +
+  return '<div class="coreCard' + (arrived ? ' arrivedCard' : '') + '"><div class="info">' +
     '<b>#' + (o.order||'') + ' — ' + (o.name||'') + '</b>' +
     (o.desc ? '<div class="desc">' + o.desc + '</div>' : '') +
     '<div class="meta">' + trk + (o.eta ? ' &middot; ETA ' + o.eta : '') + '</div>' +
@@ -242,26 +341,25 @@ function renderIncoming(list) {
 
   var html = '';
   html += '<div class="daySection"><div class="dayHead arrived"><span class="dot"></span><h3>✅ Arrived — check in now</h3><span class="count">' + arrived.length + '</span></div>';
-  html += arrived.length ? arrived.map(coreCard).join('') : '<div class="emptyDay">Nothing arrived yet.</div>';
+  html += arrived.length ? arrived.map(function(o){ return coreCard(o, true); }).join('') : '<div class="emptyDay">Nothing arrived yet.</div>';
   html += '</div>';
 
   var today = new Date(); today.setHours(0,0,0,0);
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var later = [];
   for (var i = 0; i < 7; i++) {
     var d = new Date(today.getTime() + i*86400000);
     var dayItems = inTransit.filter(function(o) { var ed = etaToDate(o.eta); return ed && ed.getTime() === d.getTime(); });
     var label = i===0 ? 'Today — ' + dayNames[d.getDay()] : (i===1 ? 'Tomorrow — ' + dayNames[d.getDay()] : dayNames[d.getDay()]);
     label += ' (' + (d.getMonth()+1) + '/' + d.getDate() + ')';
     html += '<div class="daySection"><div class="dayHead' + (i===0?' today':'') + '"><span class="dot"></span><h3>' + label + '</h3><span class="count">' + dayItems.length + '</span></div>';
-    html += dayItems.length ? dayItems.map(coreCard).join('') : '<div class="emptyDay">Nothing scheduled.</div>';
+    html += dayItems.length ? dayItems.map(function(o){ return coreCard(o, false); }).join('') : '<div class="emptyDay">Nothing scheduled.</div>';
     html += '</div>';
   }
   var weekEnd = new Date(today.getTime() + 7*86400000);
-  later = inTransit.filter(function(o) { var ed = etaToDate(o.eta); return !ed || ed.getTime() >= weekEnd.getTime(); });
+  var later = inTransit.filter(function(o) { var ed = etaToDate(o.eta); return !ed || ed.getTime() >= weekEnd.getTime(); });
   if (later.length) {
     html += '<div class="daySection"><div class="dayHead"><span class="dot" style="background:var(--muted)"></span><h3>Later / No ETA yet</h3><span class="count">' + later.length + '</span></div>';
-    html += later.map(coreCard).join('');
+    html += later.map(function(o){ return coreCard(o, false); }).join('');
     html += '</div>';
   }
   document.getElementById('tableWrap').innerHTML = html;
@@ -269,7 +367,7 @@ function renderIncoming(list) {
 
 function renderAllTable(list) {
   list.sort(function(a,b){ return (b.ship||'') < (a.ship||'') ? -1 : 1; });
-  if (!list.length) { document.getElementById('tableWrap').innerHTML = '<div class="empty">No orders match.</div>'; return; }
+  if (!list.length) { document.getElementById('tableWrap').innerHTML = '<div class="empty panel">No orders match.</div>'; return; }
   var rows = list.map(function(o) {
     var st = displayStatus(o);
     var resolved = (st === 'Received' || st === 'Waived');
@@ -288,7 +386,7 @@ function renderAllTable(list) {
     '</tr>';
   }).join('');
   document.getElementById('tableWrap').innerHTML =
-    '<table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    '<div class="panel tableCard"><table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function render() {
