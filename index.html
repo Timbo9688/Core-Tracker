@@ -304,15 +304,22 @@ function daysSince(shipStr) {
   return days + 'd';
 }
 
-function action(order, act, btn) {
+function action(order, act, btn, extraParams) {
   btn.disabled = true; btn.textContent = '...';
-  fetch(API_URL + '?action=' + act + '&order=' + encodeURIComponent(order) + '&token=' + encodeURIComponent(ACTION_TOKEN))
+  var url = API_URL + '?action=' + act + '&order=' + encodeURIComponent(order) + '&token=' + encodeURIComponent(ACTION_TOKEN) + (extraParams||'');
+  fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(res){
       if (res.ok) { setStatusMsg('#' + order + ' updated.'); pull(); }
       else { setStatusMsg('Error: ' + (res.error||'unknown')); btn.disabled=false; }
     })
     .catch(function(e){ setStatusMsg('Error: ' + e); btn.disabled=false; });
+}
+
+function pauseWithNote(order, btn) {
+  var note = prompt('Why are you pausing #' + order + '? (e.g. "8/19 — customer requested 30-day core extension")', '');
+  if (note === null) return;   // cancelled
+  action(order, 'pause', btn, note ? '&note=' + encodeURIComponent(note) : '');
 }
 
 function etaToDate(etaStr) {
@@ -383,13 +390,14 @@ function renderAllTable(list) {
     var paused = !!o.paused;
     var pauseBtn = paused
       ? '<button class="rowbtn resume" onclick="action(\'' + o.order + '\',\'resume\',this)">▶ Resume</button>'
-      : '<button class="rowbtn pause" onclick="action(\'' + o.order + '\',\'pause\',this)">⏸ Pause</button>';
+      : '<button class="rowbtn pause" onclick="pauseWithNote(\'' + o.order + '\',this)">⏸ Pause</button>';
     var actions = resolved ? '<span style="color:var(--muted);font-size:12px">resolved</span>' :
       '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">Check In</button>' +
       '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>' +
       pauseBtn;
     var reminderCell = (o.stage||0) + '/4' + (o.lastRem ? ' <div style="color:var(--muted);font-size:11px">' + o.lastRem + '</div>' : '');
     if (paused) reminderCell += ' <span class="pill waived" style="margin-top:3px;display:inline-block">⏸ Paused</span>';
+    var notesCell = o.notes ? '<div style="color:var(--muted);font-size:11.5px;max-width:200px">' + o.notes + '</div>' : '';
     return '<tr>' +
       '<td><b>#' + (o.order||'') + '</b></td>' +
       '<td>' + (o.name||'') + '<div style="color:var(--muted);font-size:11px">' + (o.desc||o.email||'') + '</div></td>' +
@@ -398,11 +406,12 @@ function renderAllTable(list) {
       '<td>' + (o.eta||'') + '</td>' +
       '<td>' + (o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '') + '</td>' +
       '<td>' + reminderCell + '</td>' +
+      '<td>' + notesCell + '</td>' +
       '<td>' + actions + '</td>' +
     '</tr>';
   }).join('');
   document.getElementById('tableWrap').innerHTML =
-    '<div class="panel tableCard"><table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    '<div class="panel tableCard"><table><thead><tr><th>Order</th><th>Customer</th><th>Ship Date</th><th>Status</th><th>ETA</th><th>Return Tracking</th><th>Reminders</th><th>Notes</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function render() {
