@@ -109,6 +109,7 @@
   .coreCard .info b { font-size:13.5px; }
   .coreCard .info .desc { color:var(--muted); font-size:12px; margin-top:3px; line-height:1.4; max-width:520px; }
   .coreCard .info .meta { color:var(--muted); font-size:11px; margin-top:5px; }
+  .etaBadge { font-size:15px; font-weight:700; color:var(--text); background:rgba(74,144,217,.14); border:1px solid rgba(74,144,217,.3); padding:6px 12px; border-radius:8px; text-align:center; min-width:64px; }
   .emptyDay { color:var(--muted); font-size:12.5px; padding:4px 2px 2px; opacity:.7; }
 
   #bgFileInput { display:none; }
@@ -324,15 +325,22 @@ function etaToDate(etaStr) {
   d.setHours(0,0,0,0);
   return d;
 }
+var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatEtaLabel(etaStr) {
+  var d = etaToDate(etaStr);
+  if (!d) return '';
+  return MONTH_NAMES[d.getMonth()] + ' ' + d.getDate();   // e.g. "Aug 21" — unambiguous, never reads as a clock time
+}
 function coreCard(o, arrived) {
   var actions = '<button class="rowbtn" onclick="action(\'' + o.order + '\',\'checkin\',this)">✓ Check In</button>' +
     '<button class="rowbtn waive" onclick="action(\'' + o.order + '\',\'waive\',this)">Waive</button>';
   var trk = o.retTn ? '<a href="https://www.google.com/search?q=' + encodeURIComponent(o.retTn) + '+tracking" target="_blank">' + o.retTn + '</a>' : '';
+  var etaBadge = o.eta ? '<div class="etaBadge">' + formatEtaLabel(o.eta) + '</div>' : '';
   return '<div class="coreCard' + (arrived ? ' arrivedCard' : '') + '"><div class="info">' +
     '<b>#' + (o.order||'') + ' — ' + (o.name||'') + '</b>' +
     (o.desc ? '<div class="desc">' + o.desc + '</div>' : '') +
-    '<div class="meta">' + trk + (o.eta ? ' &middot; ETA ' + o.eta : '') + '</div>' +
-    '</div><div style="white-space:nowrap">' + actions + '</div></div>';
+    (trk ? '<div class="meta">' + trk + '</div>' : '') +
+    '</div><div style="display:flex;align-items:center;gap:14px;white-space:nowrap">' + etaBadge + actions + '</div></div>';
 }
 
 function renderIncoming(list) {
